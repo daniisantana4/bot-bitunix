@@ -6,9 +6,12 @@ from bitunix_client import BitunixClient
 
 load_dotenv()
 
+intents = discord.Intents.default()
+intents.message_content = True
+
 class MyClient(discord.Client):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(intents=intents, *args, **kwargs)
         self.bitunix = BitunixClient()
 
     async def on_ready(self):
@@ -74,10 +77,10 @@ class MyClient(discord.Client):
 
 if __name__ == "__main__":
     token = os.getenv("DISCORD_TOKEN")
-    # DEBUG TEMPORAL — eliminar tras verificar
     if token:
         print(f"🔑 Token cargado: '{token[:10]}...{token[-5:]}' (longitud: {len(token)})")
     else:
         print("❌ DISCORD_TOKEN no encontrado — revisa las variables en Railway")
+        exit(1)
     client = MyClient()
     client.run(token)
