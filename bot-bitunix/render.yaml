@@ -1,0 +1,15 @@
+services:
+  - type: worker
+    name: discord-trading-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: BITUNIX_API_KEY
+        sync: false
+      - key: BITUNIX_SECRET_KEY
+        sync: false
+      - key: CHANNEL_ID
+        sync: false
