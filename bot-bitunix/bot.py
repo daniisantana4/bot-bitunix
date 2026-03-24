@@ -38,10 +38,8 @@ class MyClient(discord.Client):
             lado       = "BUY" if "LONG" in texto else "SELL"
 
             if "MARKET" in texto:
-                # Orden a mercado — no necesita precio
                 self.bitunix.enviar_orden_mercado(par, lado, porcentaje)
             else:
-                # Orden límite — requiere PRECIO: X
                 precio = float(re.search(r"PRECIO:\s*(\d+\.?\d*)", texto).group(1))
                 self.bitunix.enviar_orden_limite(par, lado, precio, porcentaje)
         except Exception as e:
@@ -57,16 +55,8 @@ class MyClient(discord.Client):
             print(f"❌ Error en TP: {e}")
 
     def procesar_cambio_tp(self, texto):
-        """
-        Formato esperado:
-          CAMBIO TP BTC/USDT 71369 25% A 71372 50%
-
-        Captura: par, precio_viejo, pct_viejo, precio_nuevo, pct_nuevo
-        """
         try:
-            par = re.search(r"([A-Z]+/[A-Z]+)", texto).group(1)
-
-            # Extraer los dos bloques "precio porcentaje%" en orden de aparición
+            par     = re.search(r"([A-Z]+/[A-Z]+)", texto).group(1)
             bloques = re.findall(r"(\d+\.?\d*)\s+(\d+)%", texto)
 
             if len(bloques) < 2:
@@ -79,16 +69,14 @@ class MyClient(discord.Client):
             pct_nuevo    = float(bloques[1][1]) / 100
 
             self.bitunix.modificar_tp(par, precio_viejo, pct_viejo, precio_nuevo, pct_nuevo)
-
         except Exception as e:
             print(f"❌ Error en cambio TP: {e}")
 
 if __name__ == "__main__":
-if __name__ == "__main__":
     token = os.getenv("DISCORD_TOKEN")
     # DEBUG TEMPORAL — eliminar tras verificar
     if token:
-        print(f"🔑 Token cargado: {token[:10]}...{token[-5:]} (longitud: {len(token)})")
+        print(f"🔑 Token cargado: '{token[:10]}...{token[-5:]}' (longitud: {len(token)})")
     else:
         print("❌ DISCORD_TOKEN no encontrado — revisa las variables en Railway")
     client = MyClient()
