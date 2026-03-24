@@ -84,5 +84,11 @@ class MyClient(discord.Client):
             print(f"❌ Error en cambio TP: {e}")
 
 if __name__ == "__main__":
-    client = MyClient()
+    # 1. Configuramos los intents básicos
+    intents = discord.Intents.default()
+    # 2. Le decimos que queremos leer el contenido de los mensajes
+    intents.message_content = True 
+    
+    # 3. Le pasamos los intents a tu cliente
+    client = MyClient(intents=intents)
     client.run(os.getenv("DISCORD_TOKEN"))
