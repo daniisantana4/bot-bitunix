@@ -1,7 +1,6 @@
 import discord
 import os
 import re
-import json
 from dotenv import load_dotenv
 from bitunix_client import BitunixClient
 
@@ -13,95 +12,81 @@ class MyClient(discord.Client):
         self.bitunix = BitunixClient()
 
     async def on_ready(self):
-        print(f'\n' + '='*30)
-        print(f'✅ SISTEMA INICIADO')
-        print(f'👤 Usuario: {self.user}')
-        print(f'📡 Canal Objetivo: {os.getenv("CHANNEL_ID")}')
-        print('='*30 + '\n')
+        print(f'\n✅ BOT ONLINE: {self.user}')
+        print(f'📡 ESCUCHANDO CANAL: {os.getenv("CHANNEL_ID")}\n')
 
     async def on_message(self, message):
-        # 1. LOG DE SEGURIDAD: Imprime CUALQUIER mensaje que veas
-        print(f"\n📩 [EVENTO] Mensaje detectado en canal: {message.channel.id}")
-        
-        # 2. COMPROBACIÓN DE ID (con limpieza de espacios)
+        # 1. Filtro de ID de canal
         target_id = os.getenv("CHANNEL_ID").strip()
-        
         if str(message.channel.id) != target_id:
-            # Si el ID no coincide, nos avisa por consola para ver si el ID está mal
-            print(f"⚠️ Ignorado: El mensaje viene del canal {message.channel.id}, pero esperamos el {target_id}")
             return
 
-        # 3. LOG DE CONTENIDO: Ver qué llega exactamente
-        print(f"🆔 ID Coincide. Autor: {message.author}")
-        print(f"📄 Texto plano: {message.content}")
+        # 2. Ignorar si es un mensaje del sistema o vacío
+        if not message.content:
+            return
+
+        # 3. Limpieza básica para procesar
+        # No pasamos a .upper() aquí para que el log se vea real, 
+        # pero los buscadores serán insensibles a mayúsculas.
+        content = message.content.replace(",", "")
         
-        # 4. DETECCIÓN DE EMBEDS (Cuadros de texto de bots/canales VIP)
-        if not message.content and message.embeds:
-            print("📦 El mensaje no tiene texto pero contiene EMBEDS (cuadros).")
-            for embed in message.embeds:
-                print(f"   Contenido del Embed: {embed.description}")
-                # Si las señales vienen en Embeds, usamos la descripción como contenido
-                content = str(embed.description).upper().replace(",", "")
-        else:
-            content = message.content.upper().replace(",", "")
-
-        # Ignorar si nosotros mismos escribimos (para evitar bucles)
-        if message.author == self.user:
-            return
-
-        # 5. PROCESAMIENTO DE SEÑALES
-        if "LONG" in content or "SHORT" in content:
-            print("🚀 Detectada SEÑAL DE APERTURA. Procesando...")
+        # 4. Detectar intención
+        if "LONG" in content.upper() or "SHORT" in content.upper():
+            print(f"🚀 SEÑAL DETECTADA: {content}")
             self.procesar_apertura(content)
-            
-        elif "TP" in content and "CAMBIO" not in content:
-            print("🎯 Detectada SEÑAL DE TAKE PROFIT. Procesando...")
+        elif "TP" in content.upper():
+            print(f"🎯 TP DETECTADO: {content}")
             self.procesar_tp(content)
-            
-        elif "CAMBIO TP" in content:
-            print("✏️ Detectada MODIFICACIÓN DE TP. Procesando...")
-            self.procesar_cambio_tp(content)
 
     def procesar_apertura(self, texto):
         try:
-            par        = re.search(r"([A-Z]+/[A-Z]+)", texto).group(1)
-            porcentaje = float(re.search(r"CANTIDAD:\s*(\d+)%", texto).group(1)) / 100
-            lado       = "BUY" if "LONG" in texto else "SELL"
+            # Buscar el Par (Ej: BTC/USDT)
+            par_match = re.search(r"([A-Z]+/[A-Z]+)", texto, re.IGNORECASE)
+            par = par_match.group(1).upper() if par_match else None
+            
+            # Buscar el Precio (Busca 'Precio:', 'precio:', 'PRECIO:' seguido de número)
+            price_match = re.search(r"precio:\s*(\d+\.?\d*)", texto, re.IGNORECASE)
+            precio = float(price_match.group(1)) if price_match else None
+            
+            # Buscar la Cantidad (Busca 'Cantidad:', 'cantidad:', 'CANTIDAD:' seguido de número y %)
+            qty_match = re.search(r"cantidad:\s*(\d+)%", texto, re.IGNORECASE)
+            porcentaje = float(qty_match.group(1)) / 100 if qty_match else None
+            
+            lado = "BUY" if "LONG" in texto.upper() else "SELL"
 
-            if "MARKET" in texto:
+            if not par or not porcentaje:
+                print("❌ No se pudo extraer el PAR o la CANTIDAD.")
+                return
+
+            if "MARKET" in texto.upper() or "MERCADO" in texto.upper():
+                print(f"⚡ Enviando orden a MERCADO para {par}")
                 self.bitunix.enviar_orden_mercado(par, lado, porcentaje)
-            else:
-                precio = float(re.search(r"PRECIO:\s*(\d+\.?\d*)", texto).group(1))
+            elif precio:
+                print(f"🕒 Enviando orden LÍMITE para {par} a {precio}")
                 self.bitunix.enviar_orden_limite(par, lado, precio, porcentaje)
+            else:
+                print("❌ Es una orden límite pero no encontré el precio.")
+
         except Exception as e:
-            print(f"❌ Error analizando apertura: {e}")
+            print(f"❌ Error crítico procesando apertura: {e}")
 
     def procesar_tp(self, texto):
         try:
-            par        = re.search(r"([A-Z]+/[A-Z]+)", texto).group(1)
-            porcentaje = float(re.search(r"(\d+)%", texto).group(1)) / 100
-            precio_tp  = float(re.search(r"EN\s*(\d+\.?\d*)", texto).group(1))
+            par_match = re.search(r"([A-Z]+/[A-Z]+)", texto, re.IGNORECASE)
+            par = par_match.group(1).upper()
+            
+            pct_match = re.search(r"(\d+)%", texto)
+            porcentaje = float(pct_match.group(1)) / 100
+            
+            # Busca el precio después de 'en', '@' o 'precio'
+            price_match = re.search(r"(?:en|@|precio:)\s*(\d+\.?\d*)", texto, re.IGNORECASE)
+            precio_tp = float(price_match.group(1))
+            
             self.bitunix.gestionar_tp(par, porcentaje, precio_tp)
         except Exception as e:
-            print(f"❌ Error analizando TP: {e}")
-
-    def procesar_cambio_tp(self, texto):
-        try:
-            par     = re.search(r"([A-Z]+/[A-Z]+)", texto).group(1)
-            bloques = re.findall(r"(\d+\.?\d*)\s+(\d+)%", texto)
-            precio_viejo = float(bloques[0][0])
-            pct_viejo    = float(bloques[0][1]) / 100
-            precio_nuevo = float(bloques[1][0])
-            pct_nuevo    = float(bloques[1][1]) / 100
-            self.bitunix.modificar_tp(par, precio_viejo, pct_viejo, precio_nuevo, pct_nuevo)
-        except Exception as e:
-            print(f"❌ Error analizando cambio TP: {e}")
+            print(f"❌ Error procesando TP: {e}")
 
 if __name__ == "__main__":
     token = os.getenv("DISCORD_TOKEN")
-    if not token:
-        print("❌ Error: No hay DISCORD_TOKEN")
-        exit(1)
-    
     client = MyClient()
     client.run(token)
