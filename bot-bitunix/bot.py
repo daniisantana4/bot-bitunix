@@ -6,12 +6,10 @@ from bitunix_client import BitunixClient
 
 load_dotenv()
 
-intents = discord.Intents.default()
-intents.message_content = True
-
 class MyClient(discord.Client):
     def __init__(self, *args, **kwargs):
-        super().__init__(intents=intents, *args, **kwargs)
+        # Los self-bots no usan el parámetro intents
+        super().__init__(*args, **kwargs)
         self.bitunix = BitunixClient()
 
     async def on_ready(self):
@@ -19,7 +17,12 @@ class MyClient(discord.Client):
         print(f'📡 Escuchando canal: {os.getenv("CHANNEL_ID")}')
 
     async def on_message(self, message):
+        # Filtro de canal: Solo procesa si coincide con el ID de las señales
         if str(message.channel.id) != os.getenv("CHANNEL_ID"):
+            return
+
+        # Ignorar mensajes propios para evitar bucles infinitos
+        if message.author == self.user:
             return
 
         content = message.content.upper().replace(",", "")
@@ -63,7 +66,7 @@ class MyClient(discord.Client):
             bloques = re.findall(r"(\d+\.?\d*)\s+(\d+)%", texto)
 
             if len(bloques) < 2:
-                print(f"❌ Formato incorrecto. Usa: CAMBIO TP BTC/USDT 71369 25% A 71372 50%")
+                print(f"❌ Formato incorrecto. Ejemplo: CAMBIO TP BTC/USDT 71369 25% A 71372 50%")
                 return
 
             precio_viejo = float(bloques[0][0])
@@ -77,10 +80,12 @@ class MyClient(discord.Client):
 
 if __name__ == "__main__":
     token = os.getenv("DISCORD_TOKEN")
-    if token:
-        print(f"🔑 Token cargado: '{token[:10]}...{token[-5:]}' (longitud: {len(token)})")
-    else:
-        print("❌ DISCORD_TOKEN no encontrado — revisa las variables en Railway")
+    if not token:
+        print("❌ DISCORD_TOKEN no encontrado en las variables de entorno.")
         exit(1)
+        
+    print(f"🔑 Iniciando sesión con token: '{token[:10]}...{token[-5:]}'")
+    
     client = MyClient()
+    # Ejecutamos sin el prefijo 'Bot ' que añade discord.py normal
     client.run(token)
