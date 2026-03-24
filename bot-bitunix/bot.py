@@ -84,11 +84,12 @@ class MyClient(discord.Client):
             print(f"❌ Error en cambio TP: {e}")
 
 if __name__ == "__main__":
-    # 1. Configuramos los intents básicos
-    intents = discord.Intents.default()
-    # 2. Le decimos que queremos leer el contenido de los mensajes
-    intents.message_content = True 
-    
-    # 3. Le pasamos los intents a tu cliente
-    client = MyClient(intents=intents)
-    client.run(os.getenv("DISCORD_TOKEN"))
+if __name__ == "__main__":
+    token = os.getenv("DISCORD_TOKEN")
+    # DEBUG TEMPORAL — eliminar tras verificar
+    if token:
+        print(f"🔑 Token cargado: {token[:10]}...{token[-5:]} (longitud: {len(token)})")
+    else:
+        print("❌ DISCORD_TOKEN no encontrado — revisa las variables en Railway")
+    client = MyClient()
+    client.run(token)
